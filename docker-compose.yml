@@ -1,7 +1,7 @@
 services:
 
   db:
-    image: public.ecr.aws/docker/library/postgres:17
+    image: public.ecr.aws/docker/library/postgres:18
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
