@@ -27,6 +27,13 @@ jobs:
           enable-cache: true
       - run: docker compose down -v --remove-orphans
       - run: docker compose up -d db redis mailcatcher
+      - name: Wait for services
+        run: |
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker compose exec -T db pg_isready -U postgres; do sleep 1; done'
+          echo "Waiting for Redis..."
+          timeout 60 bash -c 'until docker compose exec -T redis redis-cli ping; do sleep 1; done'
+          echo "Services are ready!"
       - name: Migrate DB
         run: uv run bash scripts/prestart.sh
         working-directory: backend
