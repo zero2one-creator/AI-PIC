@@ -10,7 +10,7 @@ from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.core import security
 from app.core.config import settings
 from app.core.security import get_password_hash
-from app.models import Message, NewPassword, Token, UserPublic
+from app.models import DeviceLogin, Message, NewPassword, Token, UserPublic, UserWithPoints
 from app.utils import (
     generate_password_reset_token,
     generate_reset_password_email,
@@ -36,10 +36,46 @@ def login_access_token(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    # 获取积分余额
+    user_points = crud.get_user_points(session=session, user_id=user.id)
+    points_balance = user_points.balance if user_points else 0
+
     return Token(
         access_token=security.create_access_token(
             user.id, expires_delta=access_token_expires
-        )
+        ),
+        user=UserWithPoints(
+            **user.model_dump(),
+            points_balance=points_balance,
+        ),
+    )
+
+
+@router.post("/login/device")
+def login_by_device(session: SessionDep, device_login: DeviceLogin) -> Token:
+    """
+    设备ID登录(自动注册)
+    """
+    user = crud.authenticate_by_device(session=session, device_id=device_login.device_id)
+
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    # 获取积分余额
+    user_points = crud.get_user_points(session=session, user_id=user.id)
+    points_balance = user_points.balance if user_points else 0
+
+    return Token(
+        access_token=security.create_access_token(
+            user.id, expires_delta=access_token_expires
+        ),
+        user=UserWithPoints(
+            **user.model_dump(),
+            points_balance=points_balance,
+        ),
     )
 
 
