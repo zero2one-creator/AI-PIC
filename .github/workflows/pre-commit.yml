@@ -49,7 +49,7 @@ jobs:
             pyproject.toml
             uv.lock
       - name: Install Dependencies
-        run: uv sync
+        run: uv sync --dev
         working-directory: backend
       - name: Run prek - pre-commit
         id: precommit

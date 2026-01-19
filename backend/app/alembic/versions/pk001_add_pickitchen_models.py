@@ -22,7 +22,7 @@ def upgrade() -> None:
     # 删除旧的 UUID 主键,添加 BIGINT 主键
     op.execute('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS user_pkey CASCADE')
     op.execute('ALTER TABLE "user" DROP COLUMN IF EXISTS id CASCADE')
-    op.add_column('user', sa.Column('id', sa.BigInteger(), nullable=False, primary_key=True))
+    op.add_column('user', sa.Column('id', sa.BigInteger(), nullable=False))
     op.create_primary_key('user_pkey', 'user', ['id'])
 
     # 添加新字段
@@ -40,6 +40,7 @@ def upgrade() -> None:
 
     # 创建索引
     op.create_index('ix_user_device_id', 'user', ['device_id'], unique=True)
+    op.execute('DROP INDEX IF EXISTS ix_user_email')
     op.create_index('ix_user_email', 'user', ['email'], unique=True)
 
     # ### 2. 修改 item 表 ###
@@ -48,7 +49,7 @@ def upgrade() -> None:
     op.execute('ALTER TABLE item DROP COLUMN IF EXISTS id CASCADE')
     op.execute('ALTER TABLE item DROP COLUMN IF EXISTS owner_id CASCADE')
 
-    op.add_column('item', sa.Column('id', sa.BigInteger(), nullable=False, primary_key=True))
+    op.add_column('item', sa.Column('id', sa.BigInteger(), nullable=False))
     op.add_column('item', sa.Column('owner_id', sa.BigInteger(), nullable=False))
 
     op.create_primary_key('item_pkey', 'item', ['id'])

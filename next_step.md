@@ -1,6 +1,6 @@
 # Next Steps: 完成部署所需的剩余工作
 
-下面按“必须完成 → 建议完成”的顺序列出步骤，并给出具体怎么做的操作指引。  
+下面按“必须完成 → 建议完成”的顺序列出步骤，并给出具体怎么做的操作指引。
 目标：让后端 API、数据库、Redis、Emoji Worker 都能稳定跑起来，并且订阅/OSS/阿里云 AI 等功能可用。
 
 ---
@@ -70,7 +70,7 @@ DATACENTER_ID=0
 WORKER_ID=0
 ```
 
-> 如果你不使用 Nacos，可以先不填 NACOS_*。  
+> 如果你不使用 Nacos，可以先不填 NACOS_*。
 > 若要启用 Nacos，在 `.env` 中加入 `NACOS_SERVER_ADDRESSES` 等配置即可。
 
 ---
