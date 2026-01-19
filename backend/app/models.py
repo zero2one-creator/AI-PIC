@@ -1,113 +1,282 @@
-import uuid
+from __future__ import annotations
 
-from pydantic import EmailStr
-from sqlmodel import Field, Relationship, SQLModel
+from datetime import datetime, timezone
+from decimal import Decimal
+from enum import Enum
 
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+)
+from sqlmodel import Field, SQLModel
 
-# Shared properties
-class UserBase(SQLModel):
-    email: EmailStr = Field(unique=True, index=True, max_length=255)
-    is_active: bool = True
-    is_superuser: bool = False
-    full_name: str | None = Field(default=None, max_length=255)
-
-
-# Properties to receive via API on creation
-class UserCreate(UserBase):
-    password: str = Field(min_length=8, max_length=128)
-
-
-class UserRegister(SQLModel):
-    email: EmailStr = Field(max_length=255)
-    password: str = Field(min_length=8, max_length=128)
-    full_name: str | None = Field(default=None, max_length=255)
+from app.core.snowflake import generate_id
 
 
-# Properties to receive via API on update, all are optional
-class UserUpdate(UserBase):
-    email: EmailStr | None = Field(default=None, max_length=255)  # type: ignore
-    password: str | None = Field(default=None, min_length=8, max_length=128)
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
-class UserUpdateMe(SQLModel):
-    full_name: str | None = Field(default=None, max_length=255)
-    email: EmailStr | None = Field(default=None, max_length=255)
+class VipType(str, Enum):
+    weekly = "weekly"
+    lifetime = "lifetime"
 
 
-class UpdatePassword(SQLModel):
-    current_password: str = Field(min_length=8, max_length=128)
-    new_password: str = Field(min_length=8, max_length=128)
+class SubscriptionStatus(str, Enum):
+    active = "active"
+    cancelled = "cancelled"
+    expired = "expired"
 
 
-# Database model, database table inferred from class name
-class User(UserBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    hashed_password: str
-    items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
+class OrderStatus(str, Enum):
+    pending = "pending"
+    paid = "paid"
+    failed = "failed"
+    refunded = "refunded"
 
 
-# Properties to return via API, id is always required
-class UserPublic(UserBase):
-    id: uuid.UUID
+class ProductType(str, Enum):
+    points_pack = "points_pack"
+    subscription = "subscription"
 
 
-class UsersPublic(SQLModel):
-    data: list[UserPublic]
-    count: int
+class PointTransactionType(str, Enum):
+    consume = "consume"
+    purchase = "purchase"
+    reward = "reward"
 
 
-# Shared properties
-class ItemBase(SQLModel):
-    title: str = Field(min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=255)
+class EmojiTaskStatus(str, Enum):
+    pending = "pending"
+    processing = "processing"
+    completed = "completed"
+    failed = "failed"
 
 
-# Properties to receive on item creation
-class ItemCreate(ItemBase):
-    pass
-
-
-# Properties to receive on item update
-class ItemUpdate(ItemBase):
-    title: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
-
-
-# Database model, database table inferred from class name
-class Item(ItemBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    owner_id: uuid.UUID = Field(
-        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+class User(SQLModel, table=True):
+    __tablename__ = "users"
+    id: int = Field(
+        default_factory=generate_id,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=False),
     )
-    owner: User | None = Relationship(back_populates="items")
+    device_id: str = Field(
+        max_length=128,
+        sa_column=Column(String(128), unique=True, index=True, nullable=False),
+    )
+    nickname: str | None = Field(default=None, max_length=64)
+
+    is_vip: bool = Field(default=False)
+    vip_type: VipType | None = Field(
+        default=None, sa_column=Column(String(16), nullable=True)
+    )
+    vip_expire_time: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
 
-# Properties to return via API, id is always required
-class ItemPublic(ItemBase):
-    id: uuid.UUID
-    owner_id: uuid.UUID
+class UserPoints(SQLModel, table=True):
+    __tablename__ = "user_points"
+    id: int = Field(
+        default_factory=generate_id,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=False),
+    )
+    user_id: int = Field(
+        sa_column=Column(
+            BigInteger,
+            ForeignKey("users.id", ondelete="CASCADE"),
+            index=True,
+            nullable=False,
+            unique=True,
+        )
+    )
+    balance: int = Field(default=0)
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
 
-class ItemsPublic(SQLModel):
-    data: list[ItemPublic]
-    count: int
+class PointTransaction(SQLModel, table=True):
+    __tablename__ = "point_transactions"
+    id: int = Field(
+        default_factory=generate_id,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=False),
+    )
+    user_id: int = Field(
+        sa_column=Column(
+            BigInteger, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+        )
+    )
+    type: PointTransactionType = Field(sa_column=Column(String(16), nullable=False))
+
+    # Negative for consume, positive for purchase/reward
+    amount: int = Field(nullable=False)
+    balance_after: int = Field(nullable=False)
+
+    task_type: str | None = Field(default=None, max_length=32)
+    order_no: str | None = Field(default=None, max_length=64)
+    reward_week: str | None = Field(default=None, max_length=8)
+
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
 
-# Generic message
+class Subscription(SQLModel, table=True):
+    __tablename__ = "subscriptions"
+    id: int = Field(
+        default_factory=generate_id,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=False),
+    )
+    user_id: int = Field(
+        sa_column=Column(
+            BigInteger, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+        )
+    )
+
+    rc_subscriber_id: str = Field(max_length=128)
+    product_id: str = Field(max_length=64)
+    plan_type: VipType = Field(sa_column=Column(String(16), nullable=False))
+
+    status: SubscriptionStatus = Field(sa_column=Column(String(16), nullable=False))
+    will_renew: bool = Field(default=True)
+
+    current_period_start: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    current_period_end: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    cancelled_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class Order(SQLModel, table=True):
+    __tablename__ = "orders"
+    id: int = Field(
+        default_factory=generate_id,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=False),
+    )
+    user_id: int = Field(
+        sa_column=Column(
+            BigInteger, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+        )
+    )
+
+    order_no: str = Field(
+        sa_column=Column(String(64), unique=True, index=True, nullable=False)
+    )
+    product_type: ProductType = Field(sa_column=Column(String(16), nullable=False))
+    product_id: str = Field(max_length=64)
+    quantity: int = Field(default=1)
+
+    amount: Decimal = Field(
+        default=Decimal("0.00"),
+        sa_column=Column(Numeric(10, 2), nullable=False),
+    )
+    currency: str = Field(default="USD", max_length=8)
+
+    status: OrderStatus = Field(sa_column=Column(String(16), nullable=False))
+    payment_channel: str | None = Field(default=None, max_length=32)
+    transaction_id: str | None = Field(default=None, max_length=128)
+
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    paid_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class EmojiTask(SQLModel, table=True):
+    __tablename__ = "emoji_tasks"
+    id: int = Field(
+        default_factory=generate_id,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=False),
+    )
+    user_id: int = Field(
+        sa_column=Column(
+            BigInteger, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+        )
+    )
+
+    driven_id: str = Field(max_length=64)
+    style_name: str | None = Field(default=None, max_length=64)
+    source_image_url: str = Field(max_length=512)
+    detect_result: dict | None = Field(default=None, sa_column=Column(JSON))
+
+    aliyun_task_id: str | None = Field(default=None, max_length=128)
+    result_url: str | None = Field(default=None, max_length=512)
+
+    status: EmojiTaskStatus = Field(sa_column=Column(String(16), nullable=False))
+    points_cost: int = Field(default=0)
+
+    error_message: str | None = Field(default=None, sa_column=Column(Text))
+
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    completed_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+
+
+class RevenueCatEvent(SQLModel, table=True):
+    __tablename__ = "revenuecat_events"
+
+    id: int = Field(
+        default_factory=generate_id,
+        sa_column=Column(BigInteger, primary_key=True, autoincrement=False),
+    )
+    event_id: str = Field(sa_column=Column(String(64), unique=True, index=True, nullable=False))
+    event_type: str = Field(max_length=64)
+    payload: dict | None = Field(default=None, sa_column=Column(JSON))
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
 class Message(SQLModel):
     message: str
 
 
-# JSON payload containing access token
 class Token(SQLModel):
     access_token: str
     token_type: str = "bearer"
 
 
-# Contents of JWT token
 class TokenPayload(SQLModel):
     sub: str | None = None
-
-
-class NewPassword(SQLModel):
-    token: str
-    new_password: str = Field(min_length=8, max_length=128)

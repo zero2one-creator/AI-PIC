@@ -19,5 +19,5 @@ def main() -> None:
     logger.info("Initial data created")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
