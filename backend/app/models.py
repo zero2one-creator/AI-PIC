@@ -10,9 +10,11 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlmodel import Field, SQLModel
 
@@ -113,6 +115,17 @@ class UserPoints(SQLModel, table=True):
 
 class PointTransaction(SQLModel, table=True):
     __tablename__ = "point_transactions"
+    __table_args__ = (
+        # Prevent duplicate weekly rewards for the same user
+        Index(
+            "idx_user_reward_week",
+            "user_id",
+            "reward_week",
+            unique=True,
+            postgresql_where=Column("reward_week").isnot(None),
+        ),
+    )
+
     id: int = Field(
         default_factory=generate_id,
         sa_column=Column(BigInteger, primary_key=True, autoincrement=False),

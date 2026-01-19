@@ -33,7 +33,15 @@ class Snowflake:
         with self._lock:
             ts = self._now_ms()
             if ts < self._last_ts:
-                # Clock moved backwards. Wait until it catches up.
+                # Clock moved backwards. Raise an error instead of waiting indefinitely.
+                # In production, this should trigger monitoring/alerting.
+                diff = self._last_ts - ts
+                if diff > 5000:  # More than 5 seconds backwards
+                    raise RuntimeError(
+                        f"Clock moved backwards by {diff}ms. "
+                        "Refusing to generate IDs to prevent duplicates."
+                    )
+                # For small clock drifts (< 5s), wait it out
                 ts = self._wait_until(self._last_ts)
 
             if ts == self._last_ts:

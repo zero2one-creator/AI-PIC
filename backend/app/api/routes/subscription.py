@@ -218,10 +218,21 @@ def webhook(
 
         user = session.get(User, user_id)
         if user:
-            # Cancelled still keeps access until expiration.
-            is_expired = expiration_at is not None and expiration_at <= now and sub.status != SubscriptionStatus.active
-            user.is_vip = not is_expired
-            user.vip_type = vip_type
+            # Determine if VIP access should be granted:
+            # - Active subscription: VIP until expiration_at (or forever if None for lifetime)
+            # - Cancelled subscription: VIP until expiration_at
+            # - Expired subscription: No VIP access
+            if sub.status == SubscriptionStatus.expired:
+                is_vip = False
+            elif expiration_at is None:
+                # Lifetime subscription with no expiration date
+                is_vip = True
+            else:
+                # Has expiration date: VIP if not yet expired
+                is_vip = expiration_at > now
+
+            user.is_vip = is_vip
+            user.vip_type = vip_type if is_vip else None
             user.vip_expire_time = expiration_at
             user.updated_at = now
             session.add(user)

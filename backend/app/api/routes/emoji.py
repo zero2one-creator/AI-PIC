@@ -101,6 +101,8 @@ def create(session: SessionDep, current_user: CurrentUser, body: EmojiCreateRequ
     )
 
     # Enqueue to Redis Streams for async processing.
+    redis_enqueue_failed = False
+    redis_error_msg = ""
     try:
         rds = get_redis()
         rds.xadd(
@@ -114,13 +116,18 @@ def create(session: SessionDep, current_user: CurrentUser, body: EmojiCreateRequ
             },
         )
     except Exception as e:
-        # Task is created but can't be processed. Mark as failed and still return the task_id,
-        # since points are consumed on task creation (even if it fails later).
+        # Mark for failure update after response
+        redis_enqueue_failed = True
+        redis_error_msg = f"Queue unavailable: {e}"
+
+    # If Redis enqueue failed, update task status in a separate transaction
+    if redis_enqueue_failed:
         task.status = EmojiTaskStatus.failed
-        task.error_message = f"Queue unavailable: {e}"
+        task.error_message = redis_error_msg
         task.completed_at = utc_now()
         session.add(task)
         session.commit()
+        session.refresh(task)
 
     data = EmojiTaskData(
         id=task.id,
