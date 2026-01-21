@@ -32,9 +32,13 @@ class Settings(BaseSettings):
     )
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = secrets.token_urlsafe(32)
-    # 60 minutes * 24 hours * 8 days = 8 days
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
+    # 60 minutes * 24 hours * 7 days = 7 days (符合技术方案)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
+
+    # Snowflake ID 配置
+    DATACENTER_ID: int = 0
+    WORKER_ID: int = 0
 
     BACKEND_CORS_ORIGINS: Annotated[
         list[AnyUrl] | str, BeforeValidator(parse_cors)
@@ -90,6 +94,40 @@ class Settings(BaseSettings):
     EMAIL_TEST_USER: EmailStr = "test@example.com"
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
+
+    # ========================================================================
+    # PicKitchen 配置
+    # ========================================================================
+
+    # Nacos 配置中心
+    NACOS_SERVER_ADDRESSES: str = "127.0.0.1:8848"
+    NACOS_NAMESPACE: str = ""
+    NACOS_USERNAME: str | None = None
+    NACOS_PASSWORD: str | None = None
+
+    # Redis 配置
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: str | None = None
+
+    # 阿里云 OSS 配置
+    OSS_ACCESS_KEY_ID: str | None = None
+    OSS_ACCESS_KEY_SECRET: str | None = None
+    OSS_ENDPOINT: str | None = None
+    OSS_BUCKET_NAME: str | None = None
+
+    # 阿里云 AI API 配置
+    ALIYUN_AI_API_KEY: str | None = None
+    ALIYUN_AI_ENDPOINT: str | None = None
+
+    # RevenueCat 配置
+    REVENUECAT_API_KEY: str | None = None
+    REVENUECAT_WEBHOOK_SECRET: str | None = None
+
+    # 积分配置
+    POINTS_EMOJI_COST: int = 10  # Emoji 生成消耗积分
+    POINTS_WEEKLY_REWARD: int = 2000  # 周订阅每周奖励积分
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":

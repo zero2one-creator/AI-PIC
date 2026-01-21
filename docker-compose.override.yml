@@ -50,6 +50,11 @@ services:
     ports:
       - "5433:5432"
 
+  redis:
+    restart: "no"
+    ports:
+      - "6379:6379"
+
   adminer:
     restart: "no"
     ports:
@@ -85,6 +90,12 @@ services:
       SMTP_PORT: "1025"
       SMTP_TLS: "false"
       EMAILS_FROM_EMAIL: "noreply@example.com"
+
+  worker:
+    restart: "no"
+
+  scheduler:
+    restart: "no"
 
   mailcatcher:
     image: public.ecr.aws/supabase/mailpit:v1.22.3

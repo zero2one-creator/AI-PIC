@@ -79,6 +79,9 @@ uv run ruff format
 - **API versioning**: All endpoints under `/api/v1`
 - **Authentication**: JWT tokens via `/api/v1/login/access-token`
 - **Database models**: SQLModel classes with `table=True` for DB tables, without for Pydantic schemas
+- **IDs**: User/Item/etc use Snowflake `BIGINT` IDs (Python `int`) rather than UUIDs; route params should use `int`
+- **ID generation**: Use `crud.create_item` (and other CRUD helpers) so Snowflake IDs are assigned consistently
+- **Service clients**: Redis/OSS/RevenueCat/Emoji services can initialize lazily from `app.core.config.settings`
 
 ### Development URLs
 
@@ -92,4 +95,3 @@ uv run ruff format
 Environment variables are in `.env` at project root. Key settings:
 - `SECRET_KEY`, `POSTGRES_PASSWORD`, `FIRST_SUPERUSER_PASSWORD` - must change from "changethis" for non-local environments
 - Backend reads config via `pydantic-settings` from `backend/app/core/config.py`
-

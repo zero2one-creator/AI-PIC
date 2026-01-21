@@ -56,6 +56,8 @@ Then deploy:
 docker compose -f docker-compose.yml up -d
 ```
 
+This compose file includes Redis, the Emoji Worker, and the weekly reward Scheduler.
+
 For production you normally run without `docker-compose.override.yml`, hence the explicit `-f docker-compose.yml`.
 
 ## Environment Variables
@@ -69,4 +71,3 @@ Core variables live in `.env`. Common ones:
 - `SMTP_*`, `EMAILS_FROM_EMAIL` (if sending real emails)
 - `POSTGRES_*`
 - `SENTRY_DSN` (optional)
-

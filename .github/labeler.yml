@@ -21,3 +21,9 @@ internal:
       - all-globs-to-all-files:
         - '!./**/*.md'
         - '!backend/**'
+
+feature:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - backend/**
