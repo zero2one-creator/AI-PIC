@@ -17,30 +17,38 @@
 
 ### 阶段 1: 数据库迁移 🗄️
 
-#### 1.1 启动本地数据库
+#### 1.1 启动本地数据库和 Redis
 ```bash
-# 在项目根目录
-docker compose up -d db redis
+# 启动 PostgreSQL 和 Redis 服务
+bash scripts/manage-services.sh start
+
+# 验证服务状态
+bash scripts/manage-services.sh status
 ```
 
 #### 1.2 生成并应用迁移文件
 ```bash
 cd backend
+source .venv/bin/activate
 
 # 生成迁移文件（包含周奖励唯一约束）
-uv run alembic revision --autogenerate -m "Add unique constraint for weekly rewards and bug fixes"
+alembic revision --autogenerate -m "Add unique constraint for weekly rewards and bug fixes"
 
 # 检查生成的迁移文件
 ls -la app/alembic/versions/
 
 # 应用迁移
-uv run alembic upgrade head
+alembic upgrade head
 ```
 
 #### 1.3 验证迁移结果
 ```bash
 # 连接数据库检查索引是否创建成功
-docker compose exec db psql -U postgres -d app -c "\d point_transactions"
+# 找到 psql 路径
+PSQL_PATH=$(find /opt/homebrew -name "psql" 2>/dev/null | head -1)
+
+# 检查表结构
+$PSQL_PATH -U postgres -d app -c "\d point_transactions"
 
 # 应该看到 idx_user_reward_week 索引
 ```
@@ -149,13 +157,16 @@ BACKEND_CORS_ORIGINS=["https://your-frontend-domain.com"]
 #### 3.1 完整本地测试
 ```bash
 # 启动所有服务
-docker compose up -d
+bash scripts/manage-services.sh start
 
-# 查看日志
-docker compose logs -f backend
+# 在终端 1 启动 API 服务器
+bash scripts/start-api.sh
 
-# 运行测试
-docker compose exec backend bash scripts/tests-start.sh
+# 在终端 2 启动 Worker
+bash scripts/start-worker.sh
+
+# 在终端 3 运行测试
+bash scripts/run-tests.sh
 
 # 测试 API
 curl http://localhost:8000/api/v1/health
@@ -215,66 +226,106 @@ curl -X POST http://localhost:8000/api/v1/subscription/webhook \
 
 #### 4.1 Emoji Worker（长期运行）
 
-**Docker Compose 方式**（推荐）:
+**本地开发方式**:
 
-编辑 `docker-compose.yml`，确保包含:
-```yaml
-services:
-  emoji-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: python -m worker.emoji_worker
-    environment:
-      - EMOJI_WORKER_CONSUMER=worker-1
-    depends_on:
-      - db
-      - redis
-    restart: unless-stopped
+在单独的终端运行:
+```bash
+bash scripts/start-worker.sh
+```
+
+**生产部署方式（使用 systemd）**:
+
+创建 `/etc/systemd/system/pickitchen-worker.service`:
+```ini
+[Unit]
+Description=PicKitchen Emoji Worker
+After=network.target postgresql.service redis.service
+
+[Service]
+Type=simple
+User=pickitchen
+WorkingDirectory=/opt/pickitchen-backend
+Environment="PATH=/opt/pickitchen-backend/.venv/bin"
+ExecStart=/opt/pickitchen-backend/.venv/bin/python -m worker.emoji_worker
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 启动:
 ```bash
-docker compose up -d emoji-worker
-docker compose logs -f emoji-worker
+sudo systemctl daemon-reload
+sudo systemctl enable pickitchen-worker
+sudo systemctl start pickitchen-worker
+sudo systemctl status pickitchen-worker
 ```
 
-**手动运行方式**:
+查看日志:
 ```bash
-cd backend
-source .venv/bin/activate
-EMOJI_WORKER_CONSUMER=worker-1 python -m worker.emoji_worker
+sudo journalctl -u pickitchen-worker -f
 ```
 
 #### 4.2 Weekly Points Reward（定时任务）
 
-**使用 Cron**:
+**本地开发方式**:
+
+手动运行:
 ```bash
-# 编辑 crontab
+cd backend
+source .venv/bin/activate
+python -m worker.weekly_points_reward
+```
+
+**生产部署方式（使用 Cron）**:
+
+编辑 crontab:
+```bash
 crontab -e
-
-# 添加以下行（每周日凌晨 0:00 UTC 运行）
-0 0 * * 0 cd /path/to/spokane/backend && /path/to/.venv/bin/python -m worker.weekly_points_reward >> /var/log/weekly_reward.log 2>&1
 ```
 
-**使用 Docker + Cron**:
-
-创建 `docker-compose.cron.yml`:
-```yaml
-services:
-  weekly-reward:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: python -m worker.weekly_points_reward
-    depends_on:
-      - db
-    restart: "no"
-```
-
-添加到系统 cron:
+添加以下行（每周日凌晨 0:00 UTC 运行）:
 ```bash
-0 0 * * 0 cd /path/to/spokane && docker compose -f docker-compose.cron.yml up weekly-reward
+0 0 * * 0 cd /opt/pickitchen-backend && /opt/pickitchen-backend/.venv/bin/python -m worker.weekly_points_reward >> /var/log/pickitchen/weekly_reward.log 2>&1
+```
+
+**生产部署方式（使用 systemd timer）**:
+
+创建 `/etc/systemd/system/pickitchen-weekly-reward.service`:
+```ini
+[Unit]
+Description=PicKitchen Weekly Points Reward
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+User=pickitchen
+WorkingDirectory=/opt/pickitchen-backend
+Environment="PATH=/opt/pickitchen-backend/.venv/bin"
+ExecStart=/opt/pickitchen-backend/.venv/bin/python -m worker.weekly_points_reward
+```
+
+创建 `/etc/systemd/system/pickitchen-weekly-reward.timer`:
+```ini
+[Unit]
+Description=PicKitchen Weekly Points Reward Timer
+Requires=pickitchen-weekly-reward.service
+
+[Timer]
+OnCalendar=Sun *-*-* 00:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+启动:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable pickitchen-weekly-reward.timer
+sudo systemctl start pickitchen-weekly-reward.timer
+sudo systemctl status pickitchen-weekly-reward.timer
 ```
 
 ---
@@ -295,38 +346,126 @@ services:
 
 #### 5.2 部署方式选择
 
-**方式 A: Docker Compose（适合单机部署）**
+**方式 A: 本地开发（推荐用于开发和测试）**
 
 ```bash
-# 在生产服务器上
-git clone <your-repo>
-cd spokane
+# 一次性设置
+bash scripts/setup-local.sh
 
-# 复制生产配置
-cp .env.production .env
+# 启动所有服务
+bash scripts/manage-services.sh start
 
-# 构建并启动
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-# 查看状态
-docker compose ps
-docker compose logs -f
+# 在不同终端启动各个组件
+bash scripts/start-api.sh          # 终端 1
+bash scripts/start-worker.sh       # 终端 2
 ```
 
-**方式 B: Kubernetes（适合集群部署）**
+**方式 B: 生产部署（Linux 服务器）**
 
-需要准备:
-1. Kubernetes 集群
-2. Helm charts（需要创建）
-3. ConfigMap 和 Secret 配置
-4. Ingress 配置
+1. 安装系统依赖:
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y python3.11 python3.11-venv postgresql redis-server nginx
 
-**方式 C: 云服务（AWS/阿里云/腾讯云）**
+# 启动服务
+sudo systemctl start postgresql
+sudo systemctl start redis-server
+sudo systemctl enable postgresql
+sudo systemctl enable redis-server
+```
 
-推荐使用:
-- 阿里云 ECS + RDS + Redis + OSS
-- AWS EC2 + RDS + ElastiCache + S3
-- 容器服务（阿里云 ACK / AWS ECS）
+2. 部署应用:
+```bash
+# 创建应用用户
+sudo useradd -m -s /bin/bash pickitchen
+
+# 克隆代码
+sudo -u pickitchen git clone <your-repo> /opt/pickitchen-backend
+cd /opt/pickitchen-backend
+
+# 安装 uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 安装依赖
+sudo -u pickitchen bash -c "cd backend && /home/pickitchen/.local/bin/uv sync"
+
+# 复制生产配置
+sudo -u pickitchen cp .env.production .env
+
+# 运行迁移
+sudo -u pickitchen bash -c "cd backend && source .venv/bin/activate && alembic upgrade head"
+```
+
+3. 配置 systemd 服务:
+```bash
+# 复制 systemd 配置文件
+sudo cp scripts/systemd/pickitchen-api.service /etc/systemd/system/
+sudo cp scripts/systemd/pickitchen-worker.service /etc/systemd/system/
+sudo cp scripts/systemd/pickitchen-weekly-reward.service /etc/systemd/system/
+sudo cp scripts/systemd/pickitchen-weekly-reward.timer /etc/systemd/system/
+
+# 启动服务
+sudo systemctl daemon-reload
+sudo systemctl enable pickitchen-api
+sudo systemctl enable pickitchen-worker
+sudo systemctl enable pickitchen-weekly-reward.timer
+sudo systemctl start pickitchen-api
+sudo systemctl start pickitchen-worker
+sudo systemctl start pickitchen-weekly-reward.timer
+```
+
+4. 配置 Nginx:
+```bash
+# 创建 Nginx 配置
+sudo tee /etc/nginx/sites-available/pickitchen << 'EOF'
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # 重定向到 HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+
+    client_max_body_size 10M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+
+# 启用配置
+sudo ln -s /etc/nginx/sites-available/pickitchen /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+**方式 C: Docker 部署（如果需要）**
+
+```bash
+# 构建镜像
+docker build -t pickitchen-backend:latest ./backend
+
+# 运行容器
+docker run -d \
+  --name pickitchen-api \
+  -p 8000:8000 \
+  --env-file .env.production \
+  pickitchen-backend:latest \
+  fastapi run app/main.py --host 0.0.0.0
+```
 
 #### 5.3 生产环境数据库迁移
 
@@ -335,16 +474,19 @@ docker compose logs -f
 ssh user@your-production-server
 
 # 进入项目目录
-cd /path/to/spokane/backend
+cd /opt/pickitchen-backend/backend
+
+# 激活虚拟环境
+source .venv/bin/activate
 
 # 备份数据库（重要！）
-docker compose exec db pg_dump -U postgres app > backup_$(date +%Y%m%d_%H%M%S).sql
+pg_dump -U postgres -h localhost app > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # 应用迁移
-uv run alembic upgrade head
+alembic upgrade head
 
 # 验证
-uv run alembic current
+alembic current
 ```
 
 ---
@@ -469,22 +611,25 @@ appendfsync everysec
 ### 问题 1: 数据库连接失败
 ```bash
 # 检查数据库是否运行
-docker compose ps db
+bash scripts/manage-services.sh status
 
 # 检查连接配置
-docker compose exec backend env | grep POSTGRES
+cd backend && source .venv/bin/activate
+python -c "from app.core.db import engine; print(engine.url)"
 
 # 测试连接
-docker compose exec backend python -c "from app.core.db import engine; print(engine.url)"
+PSQL_PATH=$(find /opt/homebrew -name "psql" 2>/dev/null | head -1)
+$PSQL_PATH -U postgres -d app -c "SELECT 1"
 ```
 
 ### 问题 2: Redis 连接失败
 ```bash
 # 检查 Redis 是否运行
-docker compose ps redis
+redis-cli ping
 
 # 测试连接
-docker compose exec backend python -c "from app.core.redis import get_redis; print(get_redis().ping())"
+cd backend && source .venv/bin/activate
+python -c "from app.core.redis import get_redis; print(get_redis().ping())"
 ```
 
 ### 问题 3: Snowflake ID 时钟回拨错误
@@ -500,25 +645,28 @@ sudo timedatectl set-ntp true
 ### 问题 4: Emoji Worker 不处理任务
 ```bash
 # 检查 Redis Stream
-docker compose exec redis redis-cli XINFO STREAM emoji_tasks
+redis-cli XINFO STREAM emoji_tasks
 
 # 检查 Consumer Group
-docker compose exec redis redis-cli XINFO GROUPS emoji_tasks
+redis-cli XINFO GROUPS emoji_tasks
 
 # 查看 Worker 日志
-docker compose logs -f emoji-worker
+bash scripts/manage-services.sh logs-redis
 ```
 
 ### 问题 5: 迁移文件冲突
 ```bash
+cd backend
+source .venv/bin/activate
+
 # 查看当前版本
-uv run alembic current
+alembic current
 
 # 查看迁移历史
-uv run alembic history
+alembic history
 
 # 如果需要回滚
-uv run alembic downgrade -1
+alembic downgrade -1
 ```
 
 ---
