@@ -12,20 +12,12 @@ repos:
       - id: end-of-file-fixer
         exclude: |
             (?x)^(
-                frontend/src/client/.*|
                 backend/app/email-templates/build/.*
             )$
       - id: trailing-whitespace
-        exclude: ^frontend/src/client/.*
+        exclude: ^backend/app/email-templates/build/.*
   - repo: local
     hooks:
-      - id: local-biome-check
-        name: biome check
-        entry: bash -c 'cd frontend && npm run lint'
-        language: system
-        types: [text]
-        files: ^frontend/
-
       - id: local-ruff-check
         name: ruff check
         entry: uv run ruff check --force-exclude --fix --exit-non-zero-on-fix

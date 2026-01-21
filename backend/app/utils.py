@@ -68,7 +68,6 @@ def generate_test_email(email_to: str) -> EmailData:
 def generate_reset_password_email(email_to: str, email: str, token: str) -> EmailData:
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - Password recovery for user {email}"
-    link = f"{settings.FRONTEND_HOST}/reset-password?token={token}"
     html_content = render_email_template(
         template_name="reset_password.html",
         context={
@@ -76,7 +75,8 @@ def generate_reset_password_email(email_to: str, email: str, token: str) -> Emai
             "username": email,
             "email": email_to,
             "valid_hours": settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS,
-            "link": link,
+            "token": token,
+            "reset_password_endpoint": f"{settings.API_V1_STR}/reset-password/",
         },
     )
     return EmailData(html_content=html_content, subject=subject)
@@ -94,7 +94,7 @@ def generate_new_account_email(
             "username": username,
             "password": password,
             "email": email_to,
-            "link": settings.FRONTEND_HOST,
+            "login_endpoint": f"{settings.API_V1_STR}/login/access-token",
         },
     )
     return EmailData(html_content=html_content, subject=subject)
