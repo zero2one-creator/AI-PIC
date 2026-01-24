@@ -1,4 +1,4 @@
-# Next Steps: 完成部署所需的剩余工作
+# Next Steps: 非 Docker 部署所需的剩余工作
 
 下面按“必须完成 → 建议完成”的顺序列出步骤，并给出具体怎么做的操作指引。
 目标：让后端 API、数据库、Redis、Emoji Worker 都能稳定跑起来，并且订阅/OSS/阿里云 AI 等功能可用。
@@ -7,16 +7,13 @@
 
 ## 1) 准备基础设施与账号（必须）
 
-1. **服务器与 DNS**
-   - 一台可公网访问的服务器（Docker Engine 已安装）。
-   - DNS 解析指向服务器 IP：
-     - `api.<your-domain>` → 后端 API
-     - `adminer.<your-domain>` → Adminer（可选）
-     - `traefik.<your-domain>` → Traefik 控制台（可选）
+1. **服务器**
+   - 一台可公网访问的服务器（Ubuntu 22.04 LTS 推荐）。
+   - 已安装 Python 3.11+，并准备好构建工具（`build-essential`、`libpq-dev` 等）。
 
 2. **外部依赖服务**
-   - **PostgreSQL**：已包含在 `docker-compose.yml`。
-   - **Redis**：已包含在 `docker-compose.yml`。
+   - **PostgreSQL**：本机安装或远端托管均可。
+   - **Redis**：本机安装或远端托管均可。
    - **OSS**：准备阿里云 OSS Bucket + AccessKey。
    - **阿里云 AI**：准备 Emoji AI 的 API Key + Endpoint。
    - **RevenueCat**：准备 API Key + Webhook Secret。
@@ -40,13 +37,13 @@ FIRST_SUPERUSER_PASSWORD=please-change
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=please-change
 POSTGRES_DB=pickitchen
-POSTGRES_SERVER=db
+POSTGRES_SERVER=127.0.0.1
 POSTGRES_PORT=5432
 
 BACKEND_CORS_ORIGINS=https://your-frontend-domain.com
 
 # Redis（必须）
-REDIS_HOST=redis
+REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_DB=0
 REDIS_PASSWORD=
@@ -75,36 +72,37 @@ WORKER_ID=0
 
 ---
 
-## 3) 启动 Traefik（可选但建议用于 HTTPS）
+## 3) 创建数据库与用户（必须）
 
-按 `deployment.md` 的“Public Traefik”部分操作，确保：
+本机 Postgres 示例（远端托管请跳过）：
 
-- 已创建 `traefik-public` 网络：
-  ```bash
-  docker network create traefik-public
-  ```
-- 服务器上已启动 Traefik：
-  ```bash
-  docker compose -f docker-compose.traefik.yml up -d
-  ```
-
----
-
-## 4) 启动 Redis（必须）
-
-`docker-compose.yml` 已内置 Redis 服务。请确认 `.env` 中：
-```
-REDIS_HOST=redis
-```
-然后直接执行 `docker compose up -d` 即可。
-
----
-
-## 5) 部署后端（必须）
-
-在服务器上执行（生产建议不带 override）：
 ```bash
-docker compose -f docker-compose.yml up -d
+sudo -u postgres psql
+```
+
+```sql
+CREATE USER pickitchen WITH PASSWORD 'please-change';
+CREATE DATABASE pickitchen OWNER pickitchen;
+```
+
+确保 `.env` 中 `POSTGRES_*` 与数据库配置一致。
+
+---
+
+## 4) 安装后端依赖（必须）
+
+```bash
+cd backend
+uv sync
+```
+
+---
+
+## 5) 迁移与初始化（必须）
+
+```bash
+cd backend
+uv run bash scripts/prestart.sh
 ```
 
 > `prestart` 会自动执行：
@@ -114,19 +112,53 @@ docker compose -f docker-compose.yml up -d
 
 ---
 
-## 6) 启动 Emoji Worker（必须，否则任务不处理）
+## 6) 启动后端 API（必须）
 
-`docker-compose.yml` 已内置 `worker` 服务，会自动启动。
+开发模式：
+
+```bash
+cd backend
+uv run fastapi dev app/main.py
+```
+
+生产模式（示例）：
+
+```bash
+cd backend
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+```
 
 ---
 
-## 7) 定时积分发放（已内置）
+## 7) 启动 Emoji Worker（必须，否则任务不处理）
 
-`docker-compose.yml` 已内置 `scheduler` 服务，每周一 00:00 UTC 发放积分。
+```bash
+cd backend
+uv run python app/worker/emoji_worker.py
+```
 
 ---
 
-## 8) 验证部署（必须）
+## 8) 定时积分发放（已内置）
+
+```bash
+cd backend
+uv run python app/worker/scheduler.py
+```
+
+---
+
+## 9) 反向代理与 HTTPS（可选但建议）
+
+可使用 Nginx/Apache 做反向代理，并通过证书实现 HTTPS。以下为 Nginx 方向的最小思路：
+
+- 反向代理到 `127.0.0.1:8000`
+- 配置 `client_max_body_size` 以支持图片上传
+- 使用 Certbot 或你现有证书配置 HTTPS
+
+---
+
+## 10) 验证部署（必须）
 
 1. 健康检查：
    ```
@@ -140,7 +172,7 @@ docker compose -f docker-compose.yml up -d
 
 ---
 
-## 9) 订阅与 Webhook（必须）
+## 11) 订阅与 Webhook（必须）
 
 在 RevenueCat 控制台配置 Webhook：
 
@@ -152,24 +184,18 @@ POST https://api.<your-domain>/api/v1/subscription/webhook
 
 ---
 
-## 10) 仍未完成的功能（可选）
-
-当前无阻塞项。
-
----
-
-## 11) 上线前建议检查（可选但强烈建议）
+## 12) 上线前建议检查（可选但强烈建议）
 
 - 确保 `.env` 中默认密码已更换
-- 生产环境开启 HTTPS（Traefik）
+- 生产环境开启 HTTPS
 - 配置日志收集/监控（Sentry 已支持）
-- 限制 Adminer 暴露或关闭
+- 限制管理端点的访问范围
 
 ---
 
 ## 如需我继续
 
 你可以告诉我：
-- 是否需要我帮你生成更精简的部署脚本
+- 是否需要我帮你生成 systemd service 文件
 - 是否需要我根据你的云厂商做定制化部署步骤
 - 是否需要我补充运行监控/告警方案
