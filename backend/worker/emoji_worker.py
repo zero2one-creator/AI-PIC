@@ -14,6 +14,7 @@ from app.enums import EmojiTaskStatus
 from app.integrations.aliyun_emoji import aliyun_emoji_client
 from app.integrations.oss import upload_from_url
 from app.models import EmojiTask, utc_now
+from app.services.config_service import refresh_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("emoji_worker")
@@ -21,6 +22,18 @@ logger = logging.getLogger("emoji_worker")
 STREAM = "emoji_tasks"
 GROUP = "emoji_worker"
 CONSUMER = os.environ.get("EMOJI_WORKER_CONSUMER", "c1")
+CONFIG_REFRESH_INTERVAL_SECONDS = 60
+
+
+def maybe_refresh_config(next_refresh_at: float) -> float:
+    now = time.time()
+    if now < next_refresh_at:
+        return next_refresh_at
+    try:
+        refresh_config()
+    except Exception:
+        logger.exception("config refresh failed")
+    return now + CONFIG_REFRESH_INTERVAL_SECONDS
 
 
 def ensure_consumer_group() -> None:
@@ -127,13 +140,16 @@ def handle_task(task_id: int) -> None:
 
 
 def main() -> None:
+    refresh_config()
     ensure_consumer_group()
     r = get_redis()
+    next_refresh_at = time.time() + CONFIG_REFRESH_INTERVAL_SECONDS
 
     logger.info("emoji worker started: stream=%s group=%s consumer=%s", STREAM, GROUP, CONSUMER)
 
     while True:
         try:
+            next_refresh_at = maybe_refresh_config(next_refresh_at)
             resp = r.xreadgroup(
                 GROUP,
                 CONSUMER,

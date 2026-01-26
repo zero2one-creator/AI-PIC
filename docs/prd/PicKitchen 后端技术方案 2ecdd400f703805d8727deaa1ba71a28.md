@@ -69,7 +69,7 @@ flowchart TB
         PG[("PostgreSQL<br>结构化数据")]
         Redis[("Redis<br>缓存")]
         OSS[("阿里云 OSS<br>图片存储")]
-        Nacos[("Nacos 3.x<br>配置中心")]
+        Config[("JSON 配置文件<br>default_config.json")]
     end
 
     subgraph External["外部服务"]
@@ -87,7 +87,7 @@ flowchart TB
     API <-->|读写| PG
     API <-->|缓存| Redis
     API -->|上传/下载| OSS
-    API -->|读取配置| Nacos
+    API -->|读取配置| Config
     Worker -->|调用| AI
     Worker -->|存储结果| OSS
     Worker -->|更新状态| PG
@@ -110,7 +110,7 @@ flowchart TB
 - **Web 服务器：** Nginx（反向代理、负载均衡）
 - **进程管理：** systemd
 - **数据库迁移：** Alembic
-- **配置中心：** Nacos 3.x（动态配置管理、服务发现）
+- **配置文件：** JSON（本地配置管理）
 - **订阅管理：** RevenueCat（统一管理 iOS/Android 订阅）
 
 ---
@@ -177,7 +177,7 @@ sequenceDiagram
 | --- | --- | --- |
 | ACCESS_TOKEN_EXPIRE | 7 天 | access_token 有效期 |
 | ALGORITHM | HS256 | 签名算法 |
-| SECRET_KEY | Nacos 配置 | 签名密钥（至少 32 位随机字符串） |
+| SECRET_KEY | 环境变量/.env | 签名密钥（至少 32 位随机字符串） |
 
 **Token 使用流程图：**
 
@@ -234,7 +234,7 @@ sequenceDiagram
 - 仅使用 access_token，无 refresh_token（设备 ID 登录场景无需）
 - Token 不存储敏感信息，仅包含 user_id
 - 服务端不存储 Token，无状态验证
-- SECRET_KEY 通过 Nacos 配置，定期轮换
+- SECRET_KEY 通过环境变量/.env 配置，定期轮换
 - 数据表：`users`
     
     
@@ -473,7 +473,7 @@ sequenceDiagram
     | --- | --- | --- |
     | reward_week | VARCHAR(8) | 奖励所属周（如 2024-W03），仅 reward 类型使用 |
 
-**Nacos 配置（pickitchen-points.json）：**
+**JSON 配置（default_config.json）：**
 
 ```json
 {
@@ -593,26 +593,19 @@ sequenceDiagram
     | created_at | DATETIME | 创建时间 |
     | completed_at | DATETIME | 完成时间 |
 
-### 2.5 配置管理模块（Nacos）
+### 2.5 配置管理模块（JSON 文件）
 
 **功能：**
 
-- 应用配置管理（数据库连接、API 密钥等）
+- 业务配置管理（风格、Banner、积分、会员奖励等）
 - 分类、风格配置管理
 - Banner 配置
 - 积分消耗配置（按任务类型）
 - 会员积分奖励配置
 
-**Nacos 配置分组：**
+**配置文件：** `backend/app/config/default_config.json`
 
-| Data ID | Group | 说明 |
-| --- | --- | --- |
-| pickitchen-app.yaml | DEFAULT_GROUP | 应用主配置（数据库、Redis、OSS 等） |
-| pickitchen-styles.json | BUSINESS | 风格模板配置（支持动态更新） |
-| pickitchen-points.json | BUSINESS | 积分规则配置 |
-| pickitchen-banners.json | BUSINESS | Banner 配置 |
-
-**配置监听：** 应用启动时从 Nacos 拉取配置，并监听配置变更实时更新（无需重启服务）
+**配置更新：** 修改文件后重启服务使其生效（配置有缓存）
 
 ---
 
@@ -744,7 +737,7 @@ Webhook 接口通过 RevenueCat 签名验证
 - **pickitchen-api.service**：FastAPI 主服务（uvicorn，4 workers）
 - **pickitchen-worker.service**：异步任务处理 Worker
 
-配置通过 Nacos 统一管理，本地仅保留 Nacos 连接信息（`.env`）。
+配置通过 JSON 文件统一管理，部署时更新 `backend/app/config/default_config.json`（可通过软链接指向外部配置）。
 
 ### 4.3 Nginx 反向代理
 
@@ -753,41 +746,14 @@ Webhook 接口通过 RevenueCat 签名验证
 - 配置 SSL 证书（Let's Encrypt）
 - 设置 client_max_body_size 限制上传大小
 
-### 4.4 Nacos 3.x 部署
+### 4.4 配置管理（JSON 文件）
 
-**部署方式：** 单机模式 + 内置嵌入式存储（初期）
+配置文件路径：`backend/app/config/default_config.json`。
 
-**部署步骤：**
+建议做法：
 
-1. 下载 Nacos 3.x：`wget` [`](https://github.com/alibaba/nacos/releases/download/3.x.x/nacos-server-3.x.x.tar.gz)[https://github.com/alibaba/nacos/releases/download/3.x.x/nacos-server-3.x.x.tar.gz`](https://github.com/alibaba/nacos/releases/download/3.x.x/nacos-server-3.x.x.tar.gz`)
-2. 解压到 `/opt/nacos`
-3. 配置 `conf/`[`application.properties`](http://application.properties)：
-
-```
-server.port=8848
-nacos.core.auth.enabled=true
-nacos.core.auth.server.identity.key=pickitchen
-nacos.core.auth.server.identity.value=<自定义密钥>
-nacos.core.auth.plugin.nacos.token.secret.key=<Base64编码的密钥>
-```
-
-1. 启动：`sh bin/`[`startup.sh`](http://startup.sh) `-m standalone`
-2. 配置 systemd 服务：`nacos.service`
-
-**安全配置：**
-
-- 开启鉴权（`nacos.core.auth.enabled=true`）
-- 仅允许 VPC 内网访问 8848 端口
-- 创建专用用户，避免使用默认的 nacos/nacos
-
-**Python 客户端集成：**
-
-```python
-# requirements.txt
-nacos-sdk-python>=2.0.0
-
-# 
-```
+1. 部署时覆盖该文件或使用软链接指向外部配置目录。
+2. 配置更新后重启 API/Worker 进程以生效（配置有缓存）。
 
 ---
 
@@ -807,7 +773,6 @@ nacos-sdk-python>=2.0.0
 | 入站 | 22 | 特定 IP | SSH 管理（仅限内部 IP） |
 | 入站 | 5432 | VPC 内网 | PostgreSQL（禁止公网访问） |
 | 入站 | 6379 | VPC 内网 | Redis（禁止公网访问） |
-| 入站 | 8848 | VPC 内网 | Nacos（禁止公网访问） |
 | 出站 | 全部 | 0.0.0.0/0 | 允许访问外部服务 |
 
 **VPC 网络隔离：**
@@ -873,11 +838,10 @@ nacos-sdk-python>=2.0.0
 
 ### 6.6 密钥与凭证管理
 
-- 敏感信息统一存储在 Nacos 配置中心，不写入代码
-- Nacos 开启鉴权，密钥配置加密存储
+- 敏感信息通过环境变量/.env 或配置文件注入，不写入代码
 - 生产环境可结合阿里云密钥管理服务 (KMS)
 - 定期轮换 API 密钥和数据库密码
-- 不同环境使用不同的 Nacos 命名空间（dev / prod）
+- 不同环境使用不同的配置文件（dev / prod）
 
 ### 6.7 安全监控与告警
 
@@ -943,10 +907,6 @@ sudo systemctl start pickitchen-worker
 sudo systemctl stop pickitchen-worker
 sudo systemctl restart pickitchen-worker
 
-# Nacos 服务
-sudo systemctl start nacos
-sudo systemctl stop nacos
-
 # 查看服务日志
 journalctl -u pickitchen-api -f          # 实时查看 API 日志
 journalctl -u pickitchen-worker -f       # 实时查看 Worker 日志
@@ -981,10 +941,9 @@ journalctl -u pickitchen-api --since "1 hour ago"  # 查看最近1小时
 {
   "status": "healthy",
   "timestamp": "2024-01-18T10:00:00Z",
-  "components": {
+    "components": {
     "database": {"status": "up", "latency_ms": 5},
-    "redis": {"status": "up", "latency_ms": 2},
-    "nacos": {"status": "up"}
+    "redis": {"status": "up", "latency_ms": 2}
   },
   "version": "1.0.0"
 }
@@ -1091,7 +1050,6 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | PostgreSQL | RDS 自动备份 | 每日全量 + 实时增量 | 7 天 | 阿里云 RDS |
 | Redis | RDB + AOF | 每小时 RDB | 3 天 | 阿里云 Redis |
-| Nacos 配置 | 手动导出 + 脚本 | 每周 / 变更后 | 30 天 | OSS |
 
 #### 数据恢复流程
 
@@ -1106,13 +1064,6 @@ flowchart LR
 pg_restore -h 
 ```
 
-**Nacos 配置恢复：**
-
-```bash
-# 从 OSS 下载配置备份
-ossutil cp oss://pickitchen-backup/nacos/
-```
-
 ---
 
 ## 九、开发与部署流程
@@ -1122,24 +1073,22 @@ ossutil cp oss://pickitchen-backup/nacos/
 1. 克隆代码仓库
 2. 创建 Python 虚拟环境
 3. 安装依赖（requirements.txt）
-4. 本地启动 Nacos（Docker 或单机模式）
-5. 配置 `.env` 指向本地 Nacos
+4. 准备 `backend/app/config/default_config.json`
 6. 运行 Alembic 数据库迁移
 7. 启动 uvicorn 开发服务器
 
 ### 8.2 生产环境部署
 
-1. 安装系统依赖（Python 3.11、PostgreSQL、Redis、Nginx、JDK 17+）
-2. 部署并配置 Nacos 3.x（参考 4.4 节）
-3. 在 Nacos 中创建配置（pickitchen-app.yaml 等）
-4. 配置 PostgreSQL 数据库和用户
-5. 部署应用代码到 /opt/pickitchen-backend
-6. 创建虚拟环境并安装依赖
-7. 配置 `.env` 指向 Nacos 地址
-8. 运行数据库迁移
-9. 配置 systemd 服务并启动
-10. 配置 Nginx 反向代理
-11. 申请 SSL 证书
+1. 安装系统依赖（Python 3.11、PostgreSQL、Redis、Nginx）
+2. 准备 `backend/app/config/default_config.json`
+3. 配置 PostgreSQL 数据库和用户
+4. 部署应用代码到 /opt/pickitchen-backend
+5. 创建虚拟环境并安装依赖
+6. 配置 `.env`
+7. 运行数据库迁移
+8. 配置 systemd 服务并启动
+9. 配置 Nginx 反向代理
+10. 申请 SSL 证书
 
 ### 8.3 CI/CD 流程
 
@@ -1204,7 +1153,7 @@ ossutil cp oss://pickitchen-backup/nacos/
 | --- | --- | --- | --- | --- |
 | 基础框架 | • FastAPI 项目结构
 • PostgreSQL + Redis 连接
-• Nacos 配置集成
+• JSON 配置加载
 • Alembic 迁移框架
 • 日志 / 异常处理 | 1天 | 可运行的基础项目 |  |
 | 用户模块 | • 设备 ID 登录/注册
@@ -1225,7 +1174,7 @@ ossutil cp oss://pickitchen-backup/nacos/
 • 订单 CRUD
 • 会员权益发放 | 1 天 | 订阅流程可联调 |  |
 | 配置模块 | • 全量配置下发 API
-• Nacos 配置监听 | 0.5天 | 配置 API 可用 |  |
+• 配置文件加载与重启生效 | 0.5天 | 配置 API 可用 |  |
 | 联调测试 | • 全流程联调
 • Bug 修复
 • 性能优化

@@ -10,7 +10,7 @@ from app import crud
 from app.core.db import engine
 from app.enums import PointTransactionType, SubscriptionStatus, VipType
 from app.models import Subscription
-from app.services.config_service import get_config
+from app.services.config_service import get_config, refresh_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("weekly_points_reward")
@@ -22,6 +22,7 @@ def _current_reward_week(now: datetime) -> str:
 
 
 def main() -> None:
+    refresh_config()
     now = datetime.now(timezone.utc)
     reward_week = _current_reward_week(now)
     cfg = get_config()
@@ -64,4 +65,3 @@ def main() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-

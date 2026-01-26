@@ -11,6 +11,8 @@ FastAPI 应用主入口
     uvicorn app.main:app --reload  # 开发模式
     fastapi dev app/main.py  # 或使用 FastAPI CLI
 """
+import asyncio
+import logging
 from typing import Any
 
 import sentry_sdk  # Sentry 错误监控
@@ -23,6 +25,12 @@ from fastapi.routing import APIRoute  # 路由类型
 from app.api.errors import AppError
 from app.api.main import api_router
 from app.core.config import settings
+from app.services.config_service import refresh_config
+
+logger = logging.getLogger(__name__)
+
+CONFIG_REFRESH_INTERVAL_SECONDS = 60
+_config_refresh_task: asyncio.Task[None] | None = None
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -55,6 +63,33 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",  # OpenAPI 规范 URL
     generate_unique_id_function=custom_generate_unique_id,  # 自定义操作 ID
 )
+
+
+async def _refresh_config_loop() -> None:
+    while True:
+        try:
+            refresh_config()
+        except Exception:
+            logger.exception("Config refresh failed")
+        await asyncio.sleep(CONFIG_REFRESH_INTERVAL_SECONDS)
+
+
+@app.on_event("startup")
+async def start_config_refresher() -> None:
+    global _config_refresh_task
+    refresh_config()
+    _config_refresh_task = asyncio.create_task(_refresh_config_loop())
+
+
+@app.on_event("shutdown")
+async def stop_config_refresher() -> None:
+    if _config_refresh_task is None:
+        return
+    _config_refresh_task.cancel()
+    try:
+        await _config_refresh_task
+    except asyncio.CancelledError:
+        pass
 
 
 @app.exception_handler(AppError)

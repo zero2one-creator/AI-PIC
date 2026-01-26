@@ -3,7 +3,7 @@
 
 提供应用配置信息的 API 端点。
 配置信息包括：轮播图、表情风格、积分规则、VIP 产品、积分包等。
-配置可以从 Nacos 动态获取，或从本地文件读取。
+配置从本地 JSON 文件读取。
 """
 from __future__ import annotations
 
@@ -34,8 +34,7 @@ def config() -> ApiEnvelope:
         ApiEnvelope: 包含配置信息的响应
 
     配置来源：
-    - 优先从 Nacos 配置中心获取（如果启用）
-    - 否则从本地 default_config.json 文件读取
+    - 本地 default_config.json 文件
     """
     cfg = get_config()
     data = ConfigData(
