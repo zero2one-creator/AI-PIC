@@ -1,0 +1,21 @@
+{
+  "banners": [],
+  "styles": [],
+  "points_rules": {
+    "emoji": 200
+  },
+  "weekly_reward": {
+    "weekly": 2000,
+    "lifetime": 3000,
+    "timezone": "UTC"
+  },
+  "vip_products": {
+    "weekly_001": "weekly",
+    "lifetime_001": "lifetime"
+  },
+  "points_packs": {
+    "points_1000": 1000,
+    "points_3000": 3000,
+    "points_10000": 10000
+  }
+}

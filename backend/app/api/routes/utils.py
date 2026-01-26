@@ -1,31 +1,29 @@
-from fastapi import APIRouter, Depends
-from pydantic.networks import EmailStr
+"""
+工具路由模块
 
-from app.api.deps import get_current_active_superuser
-from app.models import Message
-from app.utils import generate_test_email, send_email
+提供系统工具类的 API 端点，如健康检查等。
+"""
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/utils", tags=["utils"])
 
 
-@router.post(
-    "/test-email/",
-    dependencies=[Depends(get_current_active_superuser)],
-    status_code=201,
-)
-def test_email(email_to: EmailStr) -> Message:
-    """
-    Test emails.
-    """
-    email_data = generate_test_email(email_to=email_to)
-    send_email(
-        email_to=email_to,
-        subject=email_data.subject,
-        html_content=email_data.html_content,
-    )
-    return Message(message="Test email sent")
-
-
 @router.get("/health-check/")
 async def health_check() -> bool:
+    """
+    健康检查端点
+
+    用于监控系统是否正常运行。
+    返回 True 表示服务正常。
+
+    请求路径: GET /api/v1/utils/health-check/
+
+    Returns:
+        bool: 总是返回 True，表示服务正常
+
+    使用场景：
+    - 负载均衡器健康检查
+    - 监控系统探活
+    - 容器编排系统（如 Kubernetes）的存活探针
+    """
     return True
