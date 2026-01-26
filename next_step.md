@@ -105,12 +105,6 @@ ALIYUN_EMOJI_MOCK=false  # 生产环境必须为 false
 EMOJI_POLL_INTERVAL_SECONDS=2
 EMOJI_POLL_TIMEOUT_SECONDS=300
 
-# ========== Nacos 配置（可选）==========
-NACOS_SERVER_ADDR=your-nacos-server:8848
-NACOS_NAMESPACE=production
-NACOS_GROUP=DEFAULT_GROUP
-NACOS_DATA_ID=pickitchen-config.json
-
 # ========== 其他配置 ==========
 ENVIRONMENT=production
 PROJECT_NAME="PicKitchen AI"

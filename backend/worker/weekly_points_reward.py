@@ -8,7 +8,8 @@ from sqlmodel import Session, select
 
 from app import crud
 from app.core.db import engine
-from app.models import PointTransactionType, Subscription, SubscriptionStatus, VipType
+from app.enums import PointTransactionType, SubscriptionStatus, VipType
+from app.models import Subscription
 from app.services.config_service import get_config
 
 logging.basicConfig(level=logging.INFO)

@@ -131,8 +131,7 @@ Environment variables are in `.env` at project root. Key settings:
 - `ALIYUN_EMOJI_MOCK` - Set to "true" for local development without API calls
 
 ### Configuration Service
-- `NACOS_SERVER_ADDR`, `NACOS_NAMESPACE`, `NACOS_GROUP`, `NACOS_DATA_ID` - Dynamic config (optional)
-- Falls back to `backend/app/config/default_config.json` if Nacos unavailable
+- Uses `backend/app/config/default_config.json` for dynamic config
 
 Backend reads config via `pydantic-settings` from `backend/app/core/config.py`
 
@@ -181,4 +180,3 @@ uv run alembic upgrade head
 Two workers need to be deployed:
 1. **emoji_worker.py** - Long-running process for async emoji generation
 2. **weekly_points_reward.py** - Cron job (run weekly, e.g., Sunday 00:00 UTC)
-

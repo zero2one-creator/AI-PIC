@@ -4,7 +4,7 @@ import time
 
 from app import crud
 from app.core.config import settings
-from app.models import PointTransactionType
+from app.enums import PointTransactionType
 
 
 class _FakeRedis:

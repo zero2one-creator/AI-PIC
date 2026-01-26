@@ -10,9 +10,10 @@ from sqlmodel import Session
 from app.core.config import settings
 from app.core.db import engine
 from app.core.redis import get_redis
+from app.enums import EmojiTaskStatus
 from app.integrations.aliyun_emoji import aliyun_emoji_client
 from app.integrations.oss import upload_from_url
-from app.models import EmojiTask, EmojiTaskStatus, utc_now
+from app.models import EmojiTask, utc_now
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("emoji_worker")

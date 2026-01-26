@@ -1,108 +1,88 @@
+"""
+配置服务模块
+
+提供本地 JSON 配置管理功能，从文件读取配置。
+配置会被缓存，避免频繁读取。
+
+配置内容：
+- banners: 轮播图列表
+- styles: 表情风格列表
+- points_rules: 积分规则
+- weekly_reward: 周奖励配置
+- vip_products: VIP 产品配置
+- points_packs: 积分包配置
+"""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from threading import Lock
-from typing import Any
+import json  # JSON 处理
+from pathlib import Path  # 路径处理
+from threading import Lock  # 线程锁
+from typing import Any  # 任意类型
 
-from app.core.config import settings
-
-try:
-    import nacos  # type: ignore
-except Exception:  # pragma: no cover
-    nacos = None
-
-_lock = Lock()
-_nacos_client: Any | None = None
-_config: dict[str, Any] | None = None
+# 全局变量（使用锁保护）
+_lock = Lock()  # 线程锁，确保线程安全
+_config: dict[str, Any] | None = None  # 配置缓存
 
 
 def get_config() -> dict[str, Any]:
     """
-    Prefer Nacos when enabled, fallback to local file.
+    获取配置（带缓存）
+
+    从本地文件读取配置，并缓存结果。
+
+    Returns:
+        dict[str, Any]: 配置字典
+
+    配置结构：
+        {
+            "banners": [...],
+            "styles": [...],
+            "points_rules": {...},
+            "weekly_reward": {...},
+            "vip_products": {...},
+            "points_packs": {...}
+        }
     """
     global _config
     with _lock:
         if _config is not None:
             return _config
 
-        cfg = _load_from_nacos() or _load_from_file()
-        _config = cfg
-        return cfg
+        _config = _load_from_file()
+        return _config
 
 
 def refresh_config() -> dict[str, Any]:
+    """
+    刷新配置缓存
+
+    强制重新加载配置（从本地文件），并更新缓存。
+
+    Returns:
+        dict[str, Any]: 新的配置字典
+
+    使用场景：
+    - 配置更新后需要立即生效
+    - 测试时需要重置配置
+    """
     global _config
     with _lock:
-        _config = _load_from_nacos() or _load_from_file()
+        _config = _load_from_file()
         return _config
 
 
 def _load_from_file() -> dict[str, Any]:
+    """
+    从本地文件加载配置
+
+    读取 backend/app/config/default_config.json 文件。
+
+    Returns:
+        dict[str, Any]: 配置字典，如果文件不存在则返回默认配置
+    """
+    # 获取配置文件路径：backend/app/config/default_config.json
     path = Path(__file__).resolve().parents[1] / "config" / "default_config.json"
     if not path.exists():
+        # 文件不存在，返回默认配置
         return {"banners": [], "styles": [], "points_rules": {}}
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _get_nacos_client() -> Any | None:
-    global _nacos_client
-    if _nacos_client is not None:
-        return _nacos_client
-    if not settings.NACOS_ENABLED:
-        return None
-    if nacos is None:
-        return None
-    if not settings.NACOS_SERVER_ADDR:
-        return None
-
-    _nacos_client = nacos.NacosClient(
-        server_addresses=settings.NACOS_SERVER_ADDR,
-        namespace=settings.NACOS_NAMESPACE or "",
-        username=settings.NACOS_USERNAME,
-        password=settings.NACOS_PASSWORD,
-    )
-    return _nacos_client
-
-
-def _load_json_config(data_id: str, group: str) -> dict[str, Any] | None:
-    client = _get_nacos_client()
-    if client is None:
-        return None
-    try:
-        content = client.get_config(data_id, group)
-    except Exception:
-        return None
-    if not content:
-        return None
-    try:
-        return json.loads(content)
-    except Exception:
-        return None
-
-
-def _load_from_nacos() -> dict[str, Any] | None:
-    client = _get_nacos_client()
-    if client is None:
-        return None
-
-    banners = _load_json_config("pickitchen-banners.json", settings.NACOS_GROUP_BUSINESS) or {}
-    styles = _load_json_config("pickitchen-styles.json", settings.NACOS_GROUP_BUSINESS) or {}
-    points = _load_json_config("pickitchen-points.json", settings.NACOS_GROUP_BUSINESS) or {}
-
-    # Normalize shape to what /config expects.
-    cfg: dict[str, Any] = {"banners": [], "styles": [], "points_rules": {}}
-    if isinstance(banners, dict):
-        cfg["banners"] = banners.get("banners", banners.get("data", banners)) if banners else []
-    if isinstance(styles, dict):
-        cfg["styles"] = styles.get("styles", styles.get("data", styles)) if styles else []
-    if isinstance(points, dict):
-        cfg["points_rules"] = points.get("points_rules", points.get("rules", points.get("points", {}))) or {}
-        if "points_packs" in points:
-            cfg["points_packs"] = points["points_packs"]
-        if "weekly_reward" in points:
-            cfg["weekly_reward"] = points["weekly_reward"]
-        if "vip_products" in points:
-            cfg["vip_products"] = points["vip_products"]
-
-    return cfg

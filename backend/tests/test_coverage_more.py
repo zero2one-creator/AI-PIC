@@ -4,10 +4,10 @@ import asyncio
 import json
 import time
 
+import httpx
 import jwt
 import pytest
 from fastapi import HTTPException
-import httpx
 from sqlmodel import Session, delete, select
 
 from app import crud
@@ -17,15 +17,15 @@ from app.core import db as core_db
 from app.core import snowflake
 from app.core.config import Settings, settings
 from app.core.redis import get_redis
-from app.integrations.aliyun_emoji import AliyunEmojiClient
+from app.enums import VipType
 from app.integrations import oss as oss_mod
+from app.integrations.aliyun_emoji import AliyunEmojiClient
 from app.integrations.oss import (
     _build_host,
     build_object_url,
-    generate_post_policy,
     upload_from_url,
 )
-from app.models import User, UserPoints, VipType
+from app.models import UserPoints
 from app.services import config_service
 
 
@@ -168,7 +168,7 @@ def test_oss_host_and_missing_config(monkeypatch):
     monkeypatch.setattr(settings, "OSS_ACCESS_KEY_ID", None)
     monkeypatch.setattr(settings, "OSS_ACCESS_KEY_SECRET", None)
     with pytest.raises(AppError):
-        generate_post_policy(key="a/b.jpg", expire_seconds=60)
+        build_object_url(key="a/b.jpg")
 
 
 def test_aliyun_emoji_non_mock_config_error():
@@ -211,36 +211,27 @@ def test_prestart_and_seed_scripts(engine, monkeypatch):
     initial_data.main()
 
 
-def test_config_service_nacos_merge(monkeypatch):
-    # Force nacos path and cover JSON parsing / merge logic.
+def test_config_service_file_load(monkeypatch):
     config_service.refresh_config()
-    monkeypatch.setattr(settings, "NACOS_ENABLED", True)
-    monkeypatch.setattr(settings, "NACOS_SERVER_ADDR", "127.0.0.1:8848")
 
-    class FakeClient:
-        def get_config(self, data_id, group):  # type: ignore[no-untyped-def]
-            if data_id == "pickitchen-banners.json":
-                return json.dumps({"banners": [{"id": 1}]})
-            if data_id == "pickitchen-styles.json":
-                return json.dumps({"styles": [{"category": "x", "templates": []}]})
-            if data_id == "pickitchen-points.json":
-                return json.dumps(
-                    {
-                        "points_rules": {"emoji": 123},
-                        "points_packs": {"points_1000": 1000},
-                        "vip_products": {"weekly_001": "weekly"},
-                        "weekly_reward": {"weekly": 2000, "lifetime": 3000},
-                    }
-                )
-            return ""
+    sample = {
+        "banners": [{"id": 1}],
+        "styles": [{"category": "x", "templates": []}],
+        "points_rules": {"emoji": 123},
+        "points_packs": {"points_1000": 1000},
+        "vip_products": {"weekly_001": "weekly"},
+        "weekly_reward": {"weekly": 2000, "lifetime": 3000},
+    }
 
-    class FakeNacos:
-        def NacosClient(self, **kwargs):  # type: ignore[no-untyped-def]
-            return FakeClient()
+    def fake_exists(_self):  # type: ignore[no-untyped-def]
+        return True
 
-    monkeypatch.setattr(config_service, "_nacos_client", None)
+    def fake_read_text(_self, encoding="utf-8"):  # type: ignore[no-untyped-def]
+        return json.dumps(sample)
+
+    monkeypatch.setattr(config_service.Path, "exists", fake_exists)
+    monkeypatch.setattr(config_service.Path, "read_text", fake_read_text)
     monkeypatch.setattr(config_service, "_config", None)
-    monkeypatch.setattr(config_service, "nacos", FakeNacos())
 
     cfg = config_service.refresh_config()
     assert cfg["banners"][0]["id"] == 1
@@ -248,6 +239,7 @@ def test_config_service_nacos_merge(monkeypatch):
     assert cfg["points_rules"]["emoji"] == 123
     assert cfg["points_packs"]["points_1000"] == 1000
     assert cfg["vip_products"]["weekly_001"] == "weekly"
+    assert cfg["weekly_reward"]["weekly"] == 2000
 
 
 def test_aliyun_emoji_client_http_paths(monkeypatch):
