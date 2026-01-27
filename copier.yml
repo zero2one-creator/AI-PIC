@@ -72,7 +72,6 @@ _exclude:
   - htmlcov
   - .cache
   - .venv
-  # Frontend
   # Logs
   - logs
   - "*.log"

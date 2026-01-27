@@ -108,7 +108,7 @@ EMOJI_POLL_TIMEOUT_SECONDS=300
 # ========== 其他配置 ==========
 ENVIRONMENT=production
 PROJECT_NAME="PicKitchen AI"
-BACKEND_CORS_ORIGINS=["https://your-frontend-domain.com"]
+BACKEND_CORS_ORIGINS=["https://your-client-domain.com"]
 ```
 
 #### 2.2 配置文件准备
