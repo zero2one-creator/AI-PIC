@@ -1,19 +1,20 @@
-# FastAPI Project - Non-Docker Deployment
+# FastAPI 项目 - 部署（非 Docker）
 
-This document describes a simple non-Docker deployment on a Linux server
-(systemd + Nginx + PostgreSQL). Adjust paths and versions to your environment.
+本文描述在 Linux 服务器上的非 Docker 部署方式
+（systemd + Nginx + PostgreSQL）。请按实际环境调整路径与版本。
+Docker 方案请见 [Docker 部署](docker.zh-CN.md)。
 
-## Prerequisites
+## 前置条件
 
-- Linux server with Python 3.10+.
-- PostgreSQL (required).
-- Redis (optional, used by emoji queue).
-- Nginx or Caddy for reverse proxy (recommended).
+- Linux 服务器（Python 3.10+）
+- PostgreSQL（必需）
+- Redis（可选，Emoji 队列会用到）
+- Nginx 或 Caddy 作为反向代理（推荐）
 
-## 1) Prepare the database
+## 1) 准备数据库
 
-Create a database and user that match your `.env` (top-level, next to this file).
-Example (PostgreSQL):
+创建与 `.env` 匹配的数据库与用户（与本文同级的根目录 `.env`）。
+示例（PostgreSQL）：
 
 ```bash
 sudo -u postgres psql
@@ -24,7 +25,7 @@ CREATE USER app_user WITH PASSWORD 'strong_password';
 CREATE DATABASE app OWNER app_user;
 ```
 
-Update `.env`:
+更新 `.env`：
 
 ```dotenv
 POSTGRES_SERVER=127.0.0.1
@@ -34,14 +35,14 @@ POSTGRES_USER=app_user
 POSTGRES_PASSWORD=strong_password
 ```
 
-## 2) Install dependencies
+## 2) 安装依赖
 
 ```bash
 cd /opt/ai-pic__ai-emoji-revcat-gpt/backend
 uv sync
 ```
 
-## 3) Run migrations and initial data
+## 3) 运行迁移与初始化数据
 
 ```bash
 cd /opt/ai-pic__ai-emoji-revcat-gpt/backend
@@ -49,9 +50,9 @@ source .venv/bin/activate
 bash scripts/prestart.sh
 ```
 
-## 4) Create a systemd service
+## 4) 创建 systemd 服务
 
-Create `/etc/systemd/system/ai-emoji-backend.service`:
+创建 `/etc/systemd/system/ai-emoji-backend.service`：
 
 ```ini
 [Unit]
@@ -71,7 +72,7 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-Reload and start:
+重载并启动：
 
 ```bash
 sudo systemctl daemon-reload
@@ -79,9 +80,9 @@ sudo systemctl enable --now ai-emoji-backend
 sudo systemctl status ai-emoji-backend
 ```
 
-## 5) Nginx reverse proxy (example)
+## 5) Nginx 反向代理（示例）
 
-Create `/etc/nginx/sites-available/ai-emoji.conf`:
+创建 `/etc/nginx/sites-available/ai-emoji.conf`：
 
 ```nginx
 server {
@@ -99,7 +100,7 @@ server {
 }
 ```
 
-Enable and reload:
+启用并重载：
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/ai-emoji.conf /etc/nginx/sites-enabled/
@@ -107,9 +108,8 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## Notes
+## 备注
 
-- Adminer is a Docker-only component in this repo; use your preferred DB client.
-- Redis is optional. If you do not run Redis, the emoji queue will return
-  "Queue unavailable" but the API can still start.
-- For HTTPS, add TLS via Nginx or use Caddy with automatic certificates.
+- Adminer 是 Docker 方案专用组件；请使用你习惯的数据库客户端。
+- Redis 可选；如果未运行 Redis，Emoji 队列会返回 “Queue unavailable”，但 API 仍可启动。
+- HTTPS 可通过 Nginx 配置证书，或使用 Caddy 自动签发。

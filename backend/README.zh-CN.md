@@ -7,7 +7,9 @@
 
 ## Docker Compose
 
-按照 [../development.md](../development.md) 的指南，使用 Docker Compose 启动本地开发环境。
+按照 [../docs/development/docker.zh-CN.md](../docs/development/docker.zh-CN.md) 的指南，
+使用 Docker Compose 启动本地开发环境。非 Docker 方式见
+[../docs/development/nodocker.zh-CN.md](../docs/development/nodocker.zh-CN.md)。
 
 ## 通用工作流
 
@@ -170,4 +172,3 @@ $ alembic upgrade head
 继续之前，请确保在 VS Code 中安装 [MJML 扩展](https://marketplace.visualstudio.com/items?itemName=attilabuti.vscode-mjml)。
 
 安装好 MJML 扩展后，你可以在 `src` 目录创建新的邮件模板。创建完成后，打开编辑器中的 `.mjml` 文件，通过 `Ctrl+Shift+P` 打开命令面板并搜索 `MJML: Export to HTML`。该操作会将 `.mjml` 转换为 `.html` 文件，然后你可以将其保存到 build 目录中。
-

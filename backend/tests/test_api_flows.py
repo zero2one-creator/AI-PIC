@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 import time
 
 from app import crud
@@ -149,26 +150,20 @@ def test_config_endpoint(client):
     assert body["data"]["points_rules"]["emoji"] == 200
 
 
-def test_emoji_upload_and_detect(client):
+def test_emoji_upload_and_detect(client, monkeypatch):
     token, _ = _login(client, device_id="device_upload_1")
     headers = {"Authorization": f"Bearer {token}"}
 
-    r = client.post("/api/v1/emoji/upload?ext=jpg", headers=headers)
+    monkeypatch.setattr(
+        "app.api.routes.emoji.upload_file", lambda **_: "https://cdn.example.com/uploads/mock.jpg"
+    )
+    files = {"file": ("test.jpg", BytesIO(b"fake image bytes"), "image/jpeg")}
+    r = client.post("/api/v1/emoji/detect", headers=headers, files=files)
     assert r.status_code == 200
     body = r.json()
     assert body["code"] == 0
-    assert body["data"]["host"].startswith("https://")
-    assert body["data"]["policy"]
-    assert body["data"]["signature"]
-    assert body["data"]["image_url"].startswith(body["data"]["host"])
-
-    r = client.post(
-        "/api/v1/emoji/detect",
-        headers=headers,
-        json={"image_url": body["data"]["image_url"]},
-    )
-    assert r.status_code == 200
-    detect = r.json()["data"]
+    detect = body["data"]
+    assert detect["image_url"].startswith("https://")
     assert detect["passed"] is True
     assert detect["face_bbox"] is not None
 

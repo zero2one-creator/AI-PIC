@@ -1,6 +1,7 @@
-# FastAPI 项目 - 部署
+# FastAPI 项目 - 部署（Docker）
 
 你可以使用 Docker Compose 将该项目部署到远程服务器。该栈为纯后端（API + 数据库 + 管理工具）。
+非 Docker 方案请见 [非 Docker 部署](nodocker.zh-CN.md)。
 
 此模板可以与一个共享的 Traefik 实例集成：由它负责 HTTPS 证书，并通过子域名进行路由转发。
 
@@ -69,4 +70,3 @@ docker compose -f docker-compose.yml up -d
 - `SMTP_*`、`EMAILS_FROM_EMAIL`（如果需要发送真实邮件）
 - `POSTGRES_*`
 - `SENTRY_DSN`（可选）
-
