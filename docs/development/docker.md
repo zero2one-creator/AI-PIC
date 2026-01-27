@@ -1,7 +1,6 @@
 # FastAPI Project - Development (Docker)
 
 Local development guide for new teammates. This version uses Docker Compose.
-For the non-Docker workflow, see [Non-Docker Development](nodocker.md).
 
 ## Environment File
 
@@ -55,17 +54,6 @@ When running with Docker Compose locally, the backend is configured to send emai
 Mailcatcher (SMTP on port 1025).
 
 - MailCatcher UI: http://localhost:1080
-
-## Hybrid: local backend + Docker dependencies
-
-If you want to run the backend process on macOS but keep DB/Redis in Docker:
-
-```bash
-docker compose stop backend
-
-cd backend
-fastapi dev app/main.py
-```
 
 ## Optional Local Domains (`localhost.tiangolo.com`)
 

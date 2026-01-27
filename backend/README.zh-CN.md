@@ -8,8 +8,7 @@
 ## Docker Compose
 
 按照 [../docs/development/docker.zh-CN.md](../docs/development/docker.zh-CN.md) 的指南，
-使用 Docker Compose 启动本地开发环境。非 Docker 方式见
-[../docs/development/nodocker.zh-CN.md](../docs/development/nodocker.zh-CN.md)。
+使用 Docker Compose 启动本地开发环境。
 
 ## 通用工作流
 

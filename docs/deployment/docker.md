@@ -1,7 +1,6 @@
 # FastAPI Project - Deployment (Docker)
 
 You can deploy this project with Docker Compose to a remote server. The stack is backend-only (API + database + admin tools).
-For non-Docker deployment, see [Non-Docker Deployment](nodocker.md).
 
 This template can integrate with a shared Traefik instance that handles HTTPS certificates and routes traffic by subdomain.
 

@@ -28,6 +28,5 @@ docker compose up -d --build
 ## Docs
 
 - Backend docs: `backend/README.md`
-- Development: `development.md`
-- Deployment: `deployment.md`
-
+- Development (Docker): `docs/development/docker.md`
+- Deployment (Docker): `docs/deployment/docker.md`

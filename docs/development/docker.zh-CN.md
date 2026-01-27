@@ -1,7 +1,6 @@
 # FastAPI 项目 - 开发（Docker）
 
 面向新同学的本地开发指南，本版本使用 Docker Compose。
-非 Docker 方式请见 [本机开发（非 Docker）](nodocker.zh-CN.md)。
 
 ## 环境文件
 
@@ -55,17 +54,6 @@ Mailcatcher 是一个本地 SMTP 服务器：它会捕获应用发出的邮件�
 （SMTP 端口 1025）。
 
 - MailCatcher UI：http://localhost:1080
-
-## 混合模式：本机跑后端 + Docker 跑依赖
-
-如果你想在 macOS 上跑后端进程，但保留 Docker 里的 DB/Redis：
-
-```bash
-docker compose stop backend
-
-cd backend
-fastapi dev app/main.py
-```
 
 ## 可选：本地域名（`localhost.tiangolo.com`）
 

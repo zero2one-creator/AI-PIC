@@ -28,6 +28,5 @@ docker compose up -d --build
 ## 文档
 
 - 后端文档：`backend/README.md`
-- 开发：`development.md`
-- 部署：`deployment.md`
-
+- 开发（Docker）：`docs/development/docker.zh-CN.md`
+- 部署（Docker）：`docs/deployment/docker.zh-CN.md`
