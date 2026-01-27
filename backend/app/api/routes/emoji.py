@@ -129,11 +129,14 @@ async def create_emoji_task(
 
     task = crud.create_emoji_task(session=session, task_in=task_in)
 
-    # 发送到 Redis Streams 队列
+    # 发送到 Redis Streams 队列 (按环境区分)
+    from app.core.config import settings
+    stream_key = f"emoji_tasks:{settings.ENVIRONMENT}"
+
     try:
         redis_client = get_redis_client()
         redis_client.xadd(
-            stream_key="emoji_tasks",
+            stream_key=stream_key,
             fields={
                 "task_id": str(task.id),
                 "image_url": image_url,

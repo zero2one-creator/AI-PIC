@@ -229,7 +229,8 @@ async def consume_tasks() -> None:
     从 Redis Streams 消费任务
     """
     redis_client = get_redis_client()
-    stream_key = "emoji_tasks"
+    # 按环境区分 stream key
+    stream_key = f"emoji_tasks:{settings.ENVIRONMENT}"
     group_name = "emoji_workers"
     consumer_name = f"worker_{int(time.time())}"
 

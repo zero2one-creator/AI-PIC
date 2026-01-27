@@ -1,0 +1,41 @@
+name: Deploy to Staging (Docker)
+
+on:
+  push:
+    branches:
+      - develop
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Staging
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/nicosia
+            git fetch origin
+            git checkout develop
+            git pull origin develop
+
+            export DOMAIN=${{ secrets.DOMAIN_STAGING }}
+            export SECRET_KEY=${{ secrets.SECRET_KEY }}
+            export FIRST_SUPERUSER=${{ secrets.FIRST_SUPERUSER }}
+            export FIRST_SUPERUSER_PASSWORD=${{ secrets.FIRST_SUPERUSER_PASSWORD }}
+            export SMTP_HOST=${{ secrets.SMTP_HOST }}
+            export SMTP_USER=${{ secrets.SMTP_USER }}
+            export SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+            export EMAILS_FROM_EMAIL=${{ secrets.EMAILS_FROM_EMAIL }}
+            export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            export SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+
+            # Build and deploy staging services (uses shared db and redis)
+            docker compose -f docker-compose.shared.yml -f docker-compose.staging.yml --project-name nicosia build backend-staging worker-staging scheduler-staging prestart-staging
+            docker compose -f docker-compose.shared.yml -f docker-compose.staging.yml --project-name nicosia up -d
