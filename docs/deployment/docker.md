@@ -1,6 +1,7 @@
 # FastAPI Project - Deployment (Docker)
 
-You can deploy this project with Docker Compose to a remote server. The stack is backend-only (API + database + admin tools).
+You can deploy this project with Docker Compose to a remote server. The stack is backend-only (API + admin tools),
+and it relies on external PostgreSQL/Redis services.
 
 This template can integrate with a shared Traefik instance that handles HTTPS certificates and routes traffic by subdomain.
 
@@ -48,6 +49,7 @@ On the server (or via CI/CD), set at least:
 
 - `ENVIRONMENT=staging|production`
 - `DOMAIN=<your-domain>`
+- Database/Redis: `POSTGRES_*`, `REDIS_*`
 - Secrets: `SECRET_KEY`, `POSTGRES_PASSWORD`, `FIRST_SUPERUSER_PASSWORD`
 
 Then deploy:
@@ -67,5 +69,5 @@ Core variables live in `.env`. Common ones:
 - `SECRET_KEY`
 - `FIRST_SUPERUSER`, `FIRST_SUPERUSER_PASSWORD`
 - `SMTP_*`, `EMAILS_FROM_EMAIL` (if sending real emails)
-- `POSTGRES_*`
+- `POSTGRES_*`, `REDIS_*`
 - `SENTRY_DSN` (optional)

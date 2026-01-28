@@ -5,7 +5,7 @@
 ## 环境文件
 
 后端会从仓库根目录 `.env` 读取环境变量（相对于 `backend/` 目录）。
-本地开发请保持 `ENVIRONMENT=local`，并按需调整 `POSTGRES_*`、`DOMAIN`、
+本地开发请保持 `ENVIRONMENT=local`，并按需调整 `POSTGRES_*`、`REDIS_*`、`DOMAIN`、
 `STACK_NAME` 等配置。不要提交真实密钥。
 
 ## 启动本地环境
@@ -36,10 +36,25 @@ docker compose logs
 docker compose logs backend
 ```
 
-## 依赖服务端口
+## 外部依赖（PostgreSQL/Redis）
 
-`docker-compose.override.yml` 将 PostgreSQL 映射到 `localhost:5433`，
-Redis 映射到 `localhost:6379`。从宿主机连接时请使用这些端口。
+该项目不再在 Docker 中启动 PostgreSQL/Redis，请确保已有可用服务。
+在 `.env` 中指向现有服务，例如：
+
+```dotenv
+POSTGRES_SERVER=<现有 Postgres 主机或IP>
+POSTGRES_PORT=5432
+POSTGRES_DB=...
+POSTGRES_USER=...
+POSTGRES_PASSWORD=...
+
+REDIS_HOST=<现有 Redis 主机或IP>
+REDIS_PORT=6379
+REDIS_DB=0
+```
+
+若服务运行在宿主机，macOS/Windows 可用 `host.docker.internal`，
+Linux 请填写宿主机 IP。
 
 ## 重置本地数据（危险操作）
 

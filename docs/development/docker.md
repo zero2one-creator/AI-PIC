@@ -5,8 +5,8 @@ Local development guide for new teammates. This version uses Docker Compose.
 ## Environment File
 
 The backend loads environment variables from the repo root `.env` (relative to `backend/`).
-Keep `ENVIRONMENT=local` for local development, and adjust `POSTGRES_*`, `DOMAIN`,
-`STACK_NAME`, and other values as needed. Avoid committing real secrets.
+Keep `ENVIRONMENT=local` for local development, and adjust `POSTGRES_*`, `REDIS_*`,
+`DOMAIN`, `STACK_NAME`, and other values as needed. Avoid committing real secrets.
 
 ## Start the local stack
 
@@ -36,10 +36,25 @@ docker compose logs
 docker compose logs backend
 ```
 
-## Local ports for dependencies
+## External dependencies (PostgreSQL/Redis)
 
-The override file maps PostgreSQL to `localhost:5433` and Redis to `localhost:6379`.
-Use these when connecting from your host (for example, GUI clients).
+This project no longer starts PostgreSQL/Redis in Docker. Make sure you have
+working services and point `.env` to them, for example:
+
+```dotenv
+POSTGRES_SERVER=<existing Postgres host or IP>
+POSTGRES_PORT=5432
+POSTGRES_DB=...
+POSTGRES_USER=...
+POSTGRES_PASSWORD=...
+
+REDIS_HOST=<existing Redis host or IP>
+REDIS_PORT=6379
+REDIS_DB=0
+```
+
+If the services run on your host, macOS/Windows can use `host.docker.internal`.
+On Linux, use the host IP.
 
 ## Reset local data (destructive)
 

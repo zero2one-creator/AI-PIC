@@ -1,43 +1,11 @@
 services:
 
-  db:
-    image: public.ecr.aws/docker/library/postgres:17
-    restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      retries: 5
-      start_period: 30s
-      timeout: 10s
-    volumes:
-      - app-db-data:/var/lib/postgresql/data/pgdata
-    env_file:
-      - .env
-    environment:
-      - PGDATA=/var/lib/postgresql/data/pgdata
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
-      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
-      - POSTGRES_DB=${POSTGRES_DB?Variable not set}
-
-  redis:
-    image: public.ecr.aws/docker/library/redis:7
-    restart: always
-    command: ["redis-server", "--appendonly", "yes"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      retries: 5
-      start_period: 10s
-      timeout: 5s
-
   adminer:
     image: public.ecr.aws/docker/library/adminer:latest
     restart: always
     networks:
       - traefik-public
       - default
-    depends_on:
-      - db
     environment:
       - ADMINER_DESIGN=pepa-linha-dark
     labels:
@@ -55,16 +23,11 @@ services:
 
   prestart:
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
+    build:
+      context: ./backend
     networks:
       - traefik-public
       - default
-    depends_on:
-      db:
-        condition: service_healthy
-        restart: true
-      redis:
-        condition: service_healthy
-        restart: true
     command: bash scripts/prestart.sh
     env_file:
       - .env
@@ -77,15 +40,15 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - EMAILS_FROM_EMAIL=${EMAILS_FROM_EMAIL}
-      - POSTGRES_SERVER=db
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
       - SNOWFLAKE_NODE_ID=${SNOWFLAKE_NODE_ID-0}
 
   backend:
@@ -95,12 +58,6 @@ services:
       - traefik-public
       - default
     depends_on:
-      db:
-        condition: service_healthy
-        restart: true
-      redis:
-        condition: service_healthy
-        restart: true
       prestart:
         condition: service_completed_successfully
     env_file:
@@ -114,15 +71,15 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - EMAILS_FROM_EMAIL=${EMAILS_FROM_EMAIL}
-      - POSTGRES_SERVER=db
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
       - SNOWFLAKE_NODE_ID=${SNOWFLAKE_NODE_ID-0}
 
     healthcheck:
@@ -153,17 +110,13 @@ services:
 
   worker:
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
+    build:
+      context: ./backend
     restart: always
     networks:
       - traefik-public
       - default
     depends_on:
-      db:
-        condition: service_healthy
-        restart: true
-      redis:
-        condition: service_healthy
-        restart: true
       prestart:
         condition: service_completed_successfully
     env_file:
@@ -172,18 +125,16 @@ services:
       - DOMAIN=${DOMAIN}
       - ENVIRONMENT=${ENVIRONMENT}
       - SECRET_KEY=${SECRET_KEY?Variable not set}
-      - POSTGRES_SERVER=db
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
       - SNOWFLAKE_NODE_ID=${SNOWFLAKE_NODE_ID-0}
     command: ["python", "worker/emoji_worker.py"]
-volumes:
-  app-db-data:
 
 networks:
   traefik-public:
