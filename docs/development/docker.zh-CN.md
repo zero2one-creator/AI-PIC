@@ -8,6 +8,8 @@
 本地开发请保持 `ENVIRONMENT=local`，并按需调整 `POSTGRES_*`、`REDIS_*`、`DOMAIN`、
 `STACK_NAME` 等配置。不要提交真实密钥。
 
+如果你是 Docker 新手，先看 `docs/development/docker-concepts.zh-CN.md`。
+
 ## 启动本地环境
 
 ```bash
