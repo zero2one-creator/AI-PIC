@@ -754,5 +754,6 @@ docker system prune
 
 - `docs/development/docker.zh-CN.md`：本地开发流程
 - `docs/development/docker-buildkit.zh-CN.md`：BuildKit 与构建缓存（为什么 `RUN --mount` 能加速）
+- `docs/development/docker-prestart.zh-CN.md`：prestart（等待 DB / 迁移 / 初始化）详解
 - `docs/deployment/docker.zh-CN.md`：部署流程
 - `docs/deployment/docker-overview.zh-CN.md`：方案整体说明
